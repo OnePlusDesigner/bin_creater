@@ -45,11 +45,11 @@ jobs:
 
         KSU_COMMIT_HASH=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/susfs-main | awk '{print $1}' | cut -c1-8)
 
-        KSU_VERSION_FULL="v${KSU_API_VERSION}-${KSU_COMMIT_HASH}-TG@qdykernel"
+        KSU_VERSION_FULL="v${KSU_API_VERSION}-${KSU_COMMIT_HASH}-xiaoxiaow"
 
         VERSION_DEFINITIONS=$(cat << EOF
         define get_ksu_version_full
-        v\\\$1-${KSU_COMMIT_HASH}-TG@qdykernel
+        v\\\$1-${KSU_COMMIT_HASH}-xiaoxiaow
         endef
 
         KSU_VERSION_API := ${KSU_API_VERSION}
