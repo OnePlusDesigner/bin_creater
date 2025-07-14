@@ -1,0 +1,107 @@
+name: Encrypt Kernel Setup Script
+
+on:
+  workflow_dispatch:
+
+jobs:
+  encrypt-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # 缓存 apt-get 安装的依赖
+    - name: Cache apt dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          /var/cache/apt/archives
+          /var/lib/apt/lists
+        key: ${{ runner.os }}-apt-${{ hashFiles('**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shc build-essential curl
+
+    - name: Create script file
+      run: |
+        # 以下第35行-68行的代码为加密脚本的内容
+        cat << 'UNIQUE_SCRIPT_END_MARKER' > suksu_setup.sh
+        #!/bin/bash
+        for i in {1..3}; do
+          KSU_API_VERSION=$(curl -fsSL "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/susfs-main/kernel/Makefile" | \
+            grep -m1 "KSU_VERSION_API :=" | awk -F'= ' '{print $2}' | tr -d '[:space:]')
+          [ -n "$KSU_API_VERSION" ] && break || sleep 2
+        done
+
+        if [ -z "$KSU_API_VERSION" ]; then
+          echo "Error:KSU_API_VERSION Not Found" >&2
+          exit 1
+        fi
+
+        KSU_COMMIT_HASH=$(git ls-remote https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/susfs-main | awk '{print $1}' | cut -c1-8)
+
+        KSU_VERSION_FULL="v${KSU_API_VERSION}-${KSU_COMMIT_HASH}-TG@qdykernel"
+
+        VERSION_DEFINITIONS=$(cat << EOF
+        define get_ksu_version_full
+        v\\\$1-${KSU_COMMIT_HASH}-TG@qdykernel
+        endef
+
+        KSU_VERSION_API := ${KSU_API_VERSION}
+        KSU_VERSION_FULL := ${KSU_VERSION_FULL}
+        EOF
+        )
+
+        sed -i '/define get_ksu_version_full/,/endef/d' kernel/Makefile
+        sed -i '/KSU_VERSION_API :=/d' kernel/Makefile
+        sed -i '/KSU_VERSION_FULL :=/d' kernel/Makefile
+
+        awk -v def="$VERSION_DEFINITIONS" '
+          /REPO_OWNER :=/ {print; print def; inserted=1; next}
+          1
+          END {if (!inserted) print def}
+        ' kernel/Makefile > kernel/Makefile.tmp && mv kernel/Makefile.tmp kernel/Makefile
+        UNIQUE_SCRIPT_END_MARKER
+        
+        chmod +x suksu_setup.sh
+        echo "✅ Script created successfully"
+
+    - name: Verify script
+      run: |
+        echo "Verifying script..."
+        if ! grep -q "#!/bin/bash" suksu_setup.sh; then
+          echo "❌ Missing shebang"
+          exit 1
+        fi
+        
+        if [ $(wc -l < suksu_setup.sh) -lt 10 ]; then
+          echo "❌ Script too short"
+          exit 1
+        fi
+
+    - name: Encrypt script
+      run: |
+        echo "🔒 Starting encryption..."
+        
+        shc -f suksu_setup.sh -o setup.bin -v -r
+        
+        if [ ! -f "setup.bin" ]; then
+          echo "❌ Encryption failed - no output file"
+          exit 1
+        fi
+        
+        echo "Encryption successful"
+        echo "File info: $(file setup.bin)"
+        echo "Size: $(du -h setup.bin)"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: encrypted-setup
+        path: setup.bin
+        retention-days: 7
