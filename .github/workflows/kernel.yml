@@ -1,0 +1,73 @@
+name: Encrypt Kernel Setup Script(kernel rename step)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  encrypt-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # 缓存 apt-get 安装的依赖
+    - name: Cache apt dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          /var/cache/apt/archives
+          /var/lib/apt/lists
+        key: ${{ runner.os }}-apt-${{ hashFiles('**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shc build-essential curl
+
+    - name: Create script file
+      run: |
+         # 以下第35行-68行的代码为加密脚本的内容
+         cat << 'UNIQUE_SCRIPT_END_MARKER' > suksu_setup.sh
+         #!/bin/bash
+         rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
+         rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
+         
+         echo "✏️ 修改版本字符串设置..."
+         sed -i 's/ -dirty//g' kernel_platform/common/scripts/setlocalversion
+         sed -i 's/ -dirty//g' kernel_platform/msm-kernel/scripts/setlocalversion
+         sed -i 's/ -dirty//g' kernel_platform/external/dtc/scripts/setlocalversion
+         sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' kernel_platform/common/scripts/setlocalversion
+         sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' kernel_platform/msm-kernel/scripts/setlocalversion
+         sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' kernel_platform/external/dtc/scripts/setlocalversion
+         sed -i '$s|echo "\$res"|echo "-oki-xiaoxiaow"|' kernel_platform/common/scripts/setlocalversion            
+         sed -i '$s|echo "\$res"|echo "-oki-xiaoxiaow"|' kernel_platform/msm-kernel/scripts/setlocalversion
+         sed -i '$s|echo "\$res"|echo "-oki-xiaoxiaow"|' kernel_platform/external/dtc/scripts/setlocalversion
+         UNIQUE_SCRIPT_END_MARKER
+        
+         chmod +x suksu_setup.sh
+         echo "✅ Script created successfully"
+
+    - name: Encrypt script
+      run: |
+        echo "🔒 Starting encryption..."
+        
+        shc -f suksu_setup.sh -o setup.bin -v -r
+        
+        if [ ! -f "setup.bin" ]; then
+          echo "❌ Encryption failed - no output file"
+          exit 1
+        fi
+        
+        echo "Encryption successful"
+        echo "File info: $(file setup.bin)"
+        echo "Size: $(du -h setup.bin)"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: encrypted-setup
+        path: setup.bin
+        retention-days: 7
