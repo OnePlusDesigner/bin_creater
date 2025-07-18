@@ -1,4 +1,4 @@
-name: Encrypt Kernel Setup Script
+name: Encrypt Kernel Setup Script(SukiSU step)
 
 on:
   workflow_dispatch:
