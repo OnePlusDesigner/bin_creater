@@ -29,7 +29,6 @@ jobs:
 
     - name: Create script file
       run: |
-         # 以下第35行-68行的代码为加密脚本的内容
          cat << 'UNIQUE_SCRIPT_END_MARKER' > suksu_setup.sh
          #!/bin/bash
          rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
