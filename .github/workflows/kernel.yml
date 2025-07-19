@@ -1,4 +1,4 @@
-name: Encrypt Kernel Setup Script(kernel rename step)
+name: 内核重命名bin
 
 on:
   workflow_dispatch:
